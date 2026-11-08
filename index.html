@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>逐漸失語的對話</title>
+    <style>
+        body {
+            background-color: #121212;
+            color: #cccccc;
+            font-family: "Courier New", Courier, monospace, "微軟正黑體";
+            margin: 0;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* --- 基礎 UI 與開場設計 --- */
+        #start-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100vh;
+            background-color: #121212;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+            transition: opacity 2.5s ease;
+        }
+        #start-screen.hidden { opacity: 0; pointer-events: none; }
+        .fade-element { transition: opacity 1s ease; }
+        .intro-text { font-size: 14px; color: #555555; margin-bottom: 50px; letter-spacing: 2px; text-align: center; line-height: 1.8; }
+        
+        #progress-container { width: 200px; height: 6px; border: 1px solid #444444; margin-bottom: 30px; opacity: 0; position: relative; overflow: hidden; }
+        #progress-fill { width: 0%; height: 100%; background-color: #888888; }
+
+        button { background: transparent; border: 1px solid #444444; color: #888888; padding: 12px 30px; font-size: 16px; letter-spacing: 4px; cursor: pointer; transition: all 0.3s ease, opacity 1s ease; user-select: none; }
+        button:hover { border-color: #888888; color: #eeeeee; background-color: rgba(255, 255, 255, 0.05); }
+        button:active { background-color: rgba(255, 255, 255, 0.2); }
+
+        @keyframes shake { 0% { transform: translateX(0); } 25% { transform: translateX(-4px); } 50% { transform: translateX(4px); } 75% { transform: translateX(-4px); } 100% { transform: translateX(0); } }
+        .shake-anim { animation: shake 0.1s ease; }
+
+        /* --- 動態狀聲詞 --- */
+        .floating-word { position: absolute; color: #666666; font-size: 22px; opacity: 0; pointer-events: none; z-index: 20; animation: floatAround 2s ease-out forwards; filter: blur(0.5px); }
+        @keyframes floatAround {
+            0% { opacity: 0; transform: translateY(20px) scale(0.8) rotate(var(--rot, 0deg)); }
+            20% { opacity: 0.8; transform: translateY(0px) scale(1.3) translateX(-15px) rotate(var(--rot, 0deg)); color: #aaaaaa; }
+            80% { opacity: 0.4; transform: translateY(-30px) scale(1) translateX(15px) rotate(var(--rot, 0deg)); }
+            100% { opacity: 0; transform: translateY(-50px) scale(0.9) rotate(var(--rot, 0deg)); }
+        }
+
+        /* --- 敲門與主介面 --- */
+        #family-text { position: absolute; text-align: center; opacity: 0; display: none; transition: opacity 2s ease; z-index: 15; }
+        .knock-sound { font-size: 24px; color: #ffffff; letter-spacing: 5px; margin-bottom: 20px; }
+        .family-voice { font-size: 16px; color: #999999; letter-spacing: 2px; line-height: 1.8; }
+
+        #main-interface { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; opacity: 0; transition: opacity 2.5s ease; z-index: 2; position: relative; }
+        #main-interface.visible { opacity: 1; }
+        .container { width: 80%; max-width: 600px; display: flex; flex-direction: column; align-items: center; }
+        h1 { font-size: 16px; font-weight: normal; margin-bottom: 20px; color: #777777; letter-spacing: 2px; align-self: flex-start; }
+        textarea { width: 100%; height: 300px; background-color: transparent; border: 1px solid #333333; color: #eeeeee; font-size: 18px; line-height: 1.6; padding: 20px; box-sizing: border-box; outline: none; resize: none; transition: border 0.3s ease; margin-bottom: 20px; }
+        textarea:focus { border: 1px solid #666666; }
+        #send-btn { align-self: flex-end; padding: 10px 40px; }
+
+        /* ========================================= */
+        /* --- 門外視角：開門與自訂圖片動畫 --- */
+        /* ========================================= */
+        #door-scene { position: fixed; top: 0; left: 0; width: 100%; height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 25; opacity: 0; pointer-events: none; transition: opacity 2s ease; }
+        #door-scene.visible { opacity: 1; }
+        
+        .voice-outside-final { font-size: 18px; color: #ffffff; letter-spacing: 4px; margin-bottom: 50px; opacity: 0; transition: opacity 1.5s ease; }
+
+        .door-container { position: relative; width: 120px; height: 220px; perspective: 1200px; opacity: 0; transition: opacity 1.5s ease; }
+        
+        .door-frame {
+            position: absolute; width: 100%; height: 100%; border: 3px solid #ffffff; border-bottom: none; box-sizing: border-box;
+            display: flex; align-items: center; justify-content: center; background-color: #000000; 
+        }
+        
+        .door-panel {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 3px solid #ffffff; box-sizing: border-box;
+            background-color: #121212; transform-origin: left; transition: transform 3s ease-in-out; z-index: 2;
+        }
+        .door-panel.open { transform: rotateY(-105deg); }
+        .door-knob { position: absolute; top: 50%; right: 15px; width: 8px; height: 8px; border: 2px solid #ffffff; border-radius: 50%; }
+        
+        .shocked-family {
+            position: absolute; 
+            width: 85%; 
+            height: 85%; 
+            opacity: 0; 
+            z-index: 1; 
+            transition: opacity 0.5s ease;
+            object-fit: contain; 
+            object-position: center;
+        }
+        .shocked-family.visible { opacity: 1; }
+
+        /* --- 最終結局畫面 --- */
+        #end-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100vh; background-color: #121212; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 30; opacity: 0; pointer-events: none; transition: opacity 3s ease; }
+        #end-screen.visible { opacity: 1; pointer-events: auto; } 
+        
+        .end-text { font-size: 20px; color: #ffffff; letter-spacing: 4px; margin-bottom: 30px; opacity: 0; transition: opacity 2s ease 1s; }
+        .end-subtext { font-size: 15px; color: #777777; letter-spacing: 2px; opacity: 0; transition: opacity 2s ease 3s; line-height: 1.8; text-align: center;}
+        
+        .end-bug-image {
+            max-width: 80%;
+            max-height: 40vh;
+            object-fit: contain;
+            margin-top: 30px;
+            opacity: 0;
+            transition: opacity 2s ease 3s; 
+        }
+
+        .restart-btn {
+            margin-top: 50px;
+            padding: 10px 30px;
+            font-size: 14px;
+            opacity: 0;
+            transition: opacity 2s ease 6s; 
+            pointer-events: none; 
+        }
+
+        #end-screen.visible .end-text, 
+        #end-screen.visible .end-subtext,
+        #end-screen.visible .end-bug-image { 
+            opacity: 1; 
+        }
+        
+        #end-screen.visible .restart-btn {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="start-screen">
+        <div id="intro-text" class="intro-text fade-element">
+            <div style="font-size: 24px; letter-spacing: 4px; margin-bottom: 10px; color: #aaaaaa;">11月9日 星期一 07:00 AM</div>
+            鬧鐘響了，你覺得身體異常沉重...
+        </div>
+        <div id="progress-container" class="fade-element"><div id="progress-fill"></div></div>
+        <button id="action-btn" class="fade-element">睜開眼睛</button>
+        <div id="family-text">
+            <div class="knock-sound">叩叩叩！</div>
+            <div class="family-voice">「你怎麼還沒起來？要遲到了！」<br>「你還好嗎？」</div>
+        </div>
+    </div>
+
+    <div id="main-interface">
+        <div class="container">
+            <h1>請向家人解釋你為什麼還沒出門...</h1>
+            <textarea id="kafka-input" placeholder="請輸入文字..."></textarea>
+            <button id="send-btn">送出</button>
+        </div>
+    </div>
+
+    <div id="door-scene">
+        <div id="voice-outside-final" class="voice-outside-final">「裡面那是什麼聲音啊！？」</div>
+        
+        <div id="door-wrapper" class="door-container">
+            <div class="door-frame">
+                <!-- 第一張圖片：震驚的臉 -->
+                <img src="Gemini_Generated_Image_kmeqc1kmeqc1kmeq.jfif" class="shocked-family" id="shocked-family" alt="震驚的臉">
+            </div>
+            <div class="door-panel" id="door-panel">
+                <div class="door-knob"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="end-screen">
+         <!-- 第二張圖片：最後的巨大甲蟲 -->
+        <img src="Gemini_Generated_Image_l0fdgil0fdgil0fd.jpg" class="end-bug-image" alt="巨大的甲蟲">
+        <div class="end-text">在門被推開的那一刻，<br>他們只看見了一隻巨大的甲蟲。</div>
+        
+        <!-- 重新開始按鈕 -->
+        <button id="restart-btn" class="restart-btn">結束</button>
+    </div>
+
+    <script>
+        const actionBtn = document.getElementById('action-btn');
+        const introText = document.getElementById('intro-text');
+        const progressContainer = document.getElementById('progress-container');
+        const progressFill = document.getElementById('progress-fill');
+        const startScreen = document.getElementById('start-screen');
+        const familyText = document.getElementById('family-text');
+        const mainInterface = document.getElementById('main-interface');
+        const textarea = document.getElementById('kafka-input');
+        const sendBtn = document.getElementById('send-btn');
+        
+        const doorScene = document.getElementById('door-scene');
+        const voiceOutsideFinal = document.getElementById('voice-outside-final');
+        const doorWrapper = document.getElementById('door-wrapper');
+        const doorPanel = document.getElementById('door-panel');
+        const shockedFamily = document.getElementById('shocked-family');
+        const endScreen = document.getElementById('end-screen');
+        const restartBtn = document.getElementById('restart-btn'); 
+
+        const bugSounds = ['嗡——', '撲簌簌', '嘶...', '咔噠', '嘰嘰', '唰唰', '窸窸窣窣', '咯咯'];
+
+        let clickStage = 0;
+        let currentProgress = 0;
+        const clickIncrement = 4; 
+        
+        let wingAudio = null;
+        let knockAudio = null; 
+        let autoSoundInterval = null; 
+        let decayInterval = null;
+
+        actionBtn.addEventListener('click', () => {
+            if (clickStage === 0) {
+                introText.style.opacity = '0';
+                actionBtn.style.opacity = '0';
+                setTimeout(() => {
+                    introText.style.display = 'none'; 
+                    actionBtn.innerText = "起床";
+                    progressContainer.style.opacity = '1';
+                    actionBtn.style.opacity = '1';
+                    
+                    try {
+                        wingAudio = new Audio('wings.mp3.mp3');
+                        wingAudio.loop = true;
+                        wingAudio.volume = 0.6;
+                        wingAudio.play().catch(e => console.log("等待音效"));
+                        knockAudio = new Audio('knock.mp3.mp3');
+                        knockAudio.volume = 0.8;
+                    } catch(err) {}
+                    
+                    clickStage = 1;
+                    autoSoundInterval = setInterval(() => {
+                        createFloatingSound();
+                        if (currentProgress > 30) createFloatingSound();
+                        if (currentProgress > 60) createFloatingSound();
+                        if (currentProgress > 85) createFloatingSound();
+                    }, 200); 
+                    decayInterval = setInterval(() => {
+                        if (currentProgress > 0) {
+                            currentProgress -= 0.6; 
+                            if (currentProgress < 0) currentProgress = 0;
+                            progressFill.style.width = currentProgress + '%';
+                        }
+                    }, 50);
+                }, 1000);
+
+            } else if (clickStage === 1) {
+                currentProgress += clickIncrement;
+                if (currentProgress > 100) currentProgress = 100;
+                progressFill.style.width = currentProgress + '%';
+
+                actionBtn.classList.remove('shake-anim');
+                void actionBtn.offsetWidth; 
+                actionBtn.classList.add('shake-anim');
+
+                if (currentProgress >= 100) {
+                    clickStage = 2; 
+                    actionBtn.style.opacity = '0';
+                    progressContainer.style.opacity = '0';
+                    actionBtn.style.pointerEvents = "none";
+                    clearInterval(decayInterval);
+                    clearInterval(autoSoundInterval);
+
+                    // 【修改點 1】：起床後，讓蟲鳴聲音立刻漸弱並停止
+                    if (wingAudio) {
+                        let stopAudio = setInterval(() => {
+                            if (wingAudio.volume > 0.05) {
+                                wingAudio.volume -= 0.05;
+                            } else {
+                                wingAudio.pause(); // 暫停音效
+                                wingAudio.currentTime = 0; // 把時間歸零，留給結局再次爆發
+                                clearInterval(stopAudio);
+                            }
+                        }, 100);
+                    }
+
+                    document.querySelectorAll('.floating-word').forEach(word => {
+                        word.style.animation = 'none'; 
+                        word.style.transition = 'opacity 0.3s ease';
+                        word.style.opacity = '0';
+                        setTimeout(() => word.remove(), 300);
+                    });
+
+                    setTimeout(() => {
+                        if(knockAudio) knockAudio.play().catch(e => console.log("等待音效"));
+                        familyText.style.display = 'block';
+                        void familyText.offsetWidth; 
+                        familyText.style.opacity = '1';
+                        
+                        setTimeout(() => {
+                            startScreen.classList.add('hidden');
+                            setTimeout(() => {
+                                mainInterface.classList.add('visible');
+                            }, 2500);
+                        }, 4000); 
+                    }, 1000); 
+                }
+            }
+        });
+
+        function createFloatingSound() {
+            const word = document.createElement('div');
+            word.classList.add('floating-word');
+            word.innerText = bugSounds[Math.floor(Math.random() * bugSounds.length)];
+            word.style.left = Math.random() * 80 + 10 + '%'; 
+            word.style.top = Math.random() * 80 + 10 + '%';  
+            const rotation = Math.random() * 90 - 45; 
+            word.style.setProperty('--rot', `${rotation}deg`);
+            const size = Math.random() * 16 + 18; 
+            word.style.fontSize = size + 'px';
+            document.body.appendChild(word);
+            setTimeout(() => { word.remove(); }, 2000); 
+        }
+
+        const glitchChars = ['░', '▨', '§', '■', '×', 'ø', '...', '咔', '嘶', '⍰', '⎔', '嘰'];
+        textarea.addEventListener('input', function(e) {
+            if (e.inputType === 'deleteContentBackward') return;
+            const currentText = this.value;
+            const length = currentText.length;
+            const cursorPosition = this.selectionStart;
+
+            if (length > 3 && cursorPosition > 0) {
+                const glitchChance = Math.min((length - 3) * 0.08, 0.95);
+                if (Math.random() < glitchChance) {
+                    const before = currentText.substring(0, cursorPosition - 1);
+                    const after = currentText.substring(cursorPosition);
+                    const glitchChar = glitchChars[Math.floor(Math.random() * glitchChars.length)];
+                    this.value = before + glitchChar + after;
+                    this.setSelectionRange(cursorPosition, cursorPosition);
+                }
+            }
+        });
+
+        // --- 送出按鈕與開門結局 ---
+        sendBtn.addEventListener('click', () => {
+            mainInterface.style.opacity = '0';
+            
+            // 【修改點 2】：按下送出時，讓蟲鳴聲猛烈地重新爆發出來！
+            if(wingAudio) { 
+                wingAudio.volume = 1.0; 
+                wingAudio.play().catch(e => console.log("音效無法播放"));
+            }
+
+            setTimeout(() => {
+                mainInterface.style.display = 'none';
+                doorScene.classList.add('visible');
+                
+                setTimeout(() => {
+                    voiceOutsideFinal.style.opacity = '1';
+                    
+                    setTimeout(() => {
+                        voiceOutsideFinal.style.opacity = '0';
+                        doorWrapper.style.opacity = '1';
+                        
+                        setTimeout(() => {
+                            doorPanel.classList.add('open');
+                            
+                            setTimeout(() => {
+                                shockedFamily.classList.add('visible');
+                                
+                                if(wingAudio) {
+                                    let fadeAudio = setInterval(() => {
+                                        if (wingAudio.volume > 0.05) {
+                                            wingAudio.volume -= 0.05;
+                                        } else {
+                                            wingAudio.pause();
+                                            clearInterval(fadeAudio);
+                                        }
+                                    }, 150);
+                                }
+
+                                setTimeout(() => {
+                                    doorScene.style.opacity = '0';
+                                    
+                                    setTimeout(() => {
+                                        endScreen.classList.add('visible');
+                                    }, 2000);
+                                    
+                                }, 3500); 
+                            }, 1500); 
+                        }, 1500); 
+                    }, 3000); 
+                }, 1000); 
+            }, 2500); 
+        });
+
+        // 重新開始事件
+        restartBtn.addEventListener('click', () => {
+            location.reload();
+        });
+
+    </script>
+</body>
+</html>
